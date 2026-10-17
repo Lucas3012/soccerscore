@@ -1,16 +1,35 @@
 import { db, ensureSchema, q, run } from "./db";
+import { findLiveMatch, fixtureFromLive, fetchResultsMap, type FeedResult } from "./live/flashscore";
 import { MAX_SELECTIONS, MIN_STAKE_CENTS } from "./money";
-import { evaluateSelection, findSelection } from "./odds/markets";
+import { evaluateScoreOnly, evaluateSelection, findSelection } from "./odds/markets";
 import { getFixtureById, getMatchStats } from "./sports";
-import { MATCH_SETTLE_MINUTES } from "./time";
-import type { MatchStats, StoredSelection } from "./types";
+import { dateKeyOf, MATCH_SETTLE_MINUTES } from "./time";
+import type { Fixture, MatchStats, StoredSelection } from "./types";
 
 export type ValidatedItem = StoredSelection & { key: string };
 
+/** Fixture reconstructed from a stored bet selection (live matches). */
+function fixtureFromStored(item: StoredSelection): Fixture {
+  const kickoff = item.kickoff ?? Date.now();
+  return {
+    id: item.matchId,
+    leagueId: `fs:${item.leagueName}`,
+    leagueName: item.leagueName,
+    country: "",
+    flag: "🌍",
+    region: "mundo",
+    date: dateKeyOf(new Date(kickoff)),
+    home: item.home,
+    away: item.away,
+    kickoff,
+    slot: "",
+  };
+}
+
 /** Revalidates a slip against the deterministic odds engine. */
-export function validateSlip(
+export async function validateSlip(
   input: unknown,
-): { ok: true; items: ValidatedItem[] } | { ok: false; error: string } {
+): Promise<{ ok: true; items: ValidatedItem[] } | { ok: false; error: string }> {
   if (!Array.isArray(input) || input.length === 0) {
     return { ok: false, error: "Cupom vazio." };
   }
@@ -30,13 +49,25 @@ export function validateSlip(
     const matchId = String(record.matchId ?? "");
     const selectionId = String(record.selectionId ?? "");
 
-    const fixture = getFixtureById(matchId);
-    if (!fixture) {
-      return { ok: false, error: "Partida não encontrada no catálogo." };
+    // Matches from the live feed (Flashscore) can be bet while they are live.
+    let fixture: Fixture;
+    if (matchId.startsWith("fs-")) {
+      const live = await findLiveMatch(matchId);
+      if (!live) {
+        return { ok: false, error: "Esta partida não está mais ao vivo — remova a seleção." };
+      }
+      fixture = fixtureFromLive(live);
+    } else {
+      const catalog = getFixtureById(matchId);
+      if (!catalog) {
+        return { ok: false, error: "Partida não encontrada no catálogo." };
+      }
+      if (catalog.kickoff <= now) {
+        return { ok: false, error: `${catalog.home} x ${catalog.away} já começou — remova a seleção.` };
+      }
+      fixture = catalog;
     }
-    if (fixture.kickoff <= now) {
-      return { ok: false, error: `${fixture.home} x ${fixture.away} já começou — remova a seleção.` };
-    }
+
     if (seenMatches.has(matchId)) {
       return { ok: false, error: "Apenas uma seleção por partida é permitida." };
     }
@@ -53,6 +84,7 @@ export function validateSlip(
       leagueName: fixture.leagueName,
       home: fixture.home,
       away: fixture.away,
+      kickoff: fixture.kickoff,
       marketId: found.market.id,
       marketName: found.market.name,
       selectionId,
@@ -168,7 +200,9 @@ type BetRow = {
 
 /**
  * Lazy settlement: pending bets whose matches have all ended are graded with
- * the deterministic simulator and the winnings (if any) are credited.
+ * the deterministic simulator and the winnings (if any) are credited. Bets on
+ * live (Flashscore) matches use the real final score whenever the market only
+ * depends on it.
  */
 export async function settleUserBets(userId: number): Promise<void> {
   const rows = await q<BetRow>(
@@ -178,6 +212,8 @@ export async function settleUserBets(userId: number): Promise<void> {
   if (rows.length === 0) return;
   const now = Date.now();
 
+  let liveResults: Map<string, FeedResult> | null = null;
+
   for (const row of rows) {
     let items: StoredSelection[];
     try {
@@ -186,12 +222,52 @@ export async function settleUserBets(userId: number): Promise<void> {
       continue;
     }
 
+    if (!liveResults && items.some((item) => item.matchId.startsWith("fs-"))) {
+      try {
+        liveResults = await fetchResultsMap();
+      } catch {
+        liveResults = new Map();
+      }
+    }
+
     let allFinished = true;
     let anyLost = false;
     let anySettled = false;
     let product = 1;
 
     for (const item of items) {
+      // ── live matches: grade with the real score from the feed ──────────
+      if (item.matchId.startsWith("fs-")) {
+        const feed = liveResults?.get(item.matchId.slice(3));
+        const kickoff = item.kickoff ?? 0;
+
+        if (!feed) {
+          // Not in today's/yesterday's feed. Wait a while, then void the leg.
+          if (kickoff > 0 && now > kickoff + MATCH_SETTLE_MINUTES * 60_000) continue;
+          allFinished = false;
+          break;
+        }
+        if (feed.status !== 3) {
+          allFinished = false;
+          break;
+        }
+
+        const real = evaluateScoreOnly(item.selectionId, feed.homeScore, feed.awayScore);
+        const result =
+          real ?? evaluateSelection(item.selectionId, getMatchStats(fixtureFromStored(item)));
+
+        if (result === "lose") {
+          anyLost = true;
+          break;
+        }
+        if (result === "win") {
+          product *= item.odd;
+          anySettled = true;
+        }
+        continue;
+      }
+
+      // ── simulated catalogue matches ────────────────────────────────────
       const fixture = getFixtureById(item.matchId);
       if (!fixture) {
         allFinished = false;

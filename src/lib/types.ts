@@ -118,6 +118,8 @@ export type StoredSelection = {
   leagueName: string;
   home: string;
   away: string;
+  /** Kickoff epoch ms — used to settle bets on live (Flashscore) matches. */
+  kickoff?: number;
   marketId: string;
   marketName: string;
   selectionId: string;

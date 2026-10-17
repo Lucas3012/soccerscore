@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Requisição inválida." }, { status: 400 });
   }
 
-  const validation = validateSlip(body.selections);
+  const validation = await validateSlip(body.selections);
   if (!validation.ok) {
     return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
   }

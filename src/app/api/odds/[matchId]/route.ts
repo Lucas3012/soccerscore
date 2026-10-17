@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { findLiveMatch, fixtureFromLive } from "@/lib/live/flashscore";
 import { buildMarkets, MARKETS_PER_MATCH } from "@/lib/odds/markets";
 import { getFixtureById } from "@/lib/sports";
 
@@ -10,7 +11,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ matc
   }
 
   const { matchId } = await params;
-  const fixture = getFixtureById(decodeURIComponent(matchId));
+  const id = decodeURIComponent(matchId);
+
+  // Live matches come from the Flashscore feed instead of the local catalogue.
+  const live = id.startsWith("fs-") ? await findLiveMatch(id) : null;
+  if (id.startsWith("fs-") && !live) {
+    return NextResponse.json(
+      { ok: false, error: "Esta partida não está mais ao vivo — recarregue a página." },
+      { status: 404 },
+    );
+  }
+
+  const fixture = live ? fixtureFromLive(live) : getFixtureById(id);
   if (!fixture) {
     return NextResponse.json({ ok: false, error: "Partida não encontrada." }, { status: 404 });
   }

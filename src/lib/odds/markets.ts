@@ -7,6 +7,7 @@ import {
 } from "../data/players";
 import type {
   Fixture,
+  GoalEvent,
   Market,
   MarketGroupId,
   MatchStats,
@@ -1356,6 +1357,70 @@ function raceWinner(events: { minute: number; team: "h" | "a" }[], target: numbe
 export function evaluateSelection(selectionId: string, stats: MatchStats): "win" | "lose" | "void" {
   const s = statsForEval(stats);
   return evaluate(s, selectionId);
+}
+
+/** Markets whose outcome depends only on the final score. */
+const SCORE_ONLY_KINDS = new Set([
+  "r",
+  "dc",
+  "btts",
+  "ou",
+  "ouh",
+  "oua",
+  "cs",
+  "ah",
+  "eh",
+  "margin",
+  "wtn",
+  "clean",
+  "exactgoals",
+  "range",
+]);
+
+/**
+ * Grades a selection with the real final score only — used for live matches,
+ * where the platform knows the score but not the event timeline. Returns null
+ * when the market needs data the score cannot provide (minutes, halves, cards,
+ * corners, players) so the caller can fall back to the simulator.
+ */
+export function evaluateScoreOnly(
+  selectionId: string,
+  goalsHome: number,
+  goalsAway: number,
+): "win" | "lose" | "void" | null {
+  const kind = selectionId.split(":")[0];
+
+  if (kind === "combo") {
+    let win = true;
+    for (const piece of selectionId.slice("combo:".length).split("|")) {
+      const result = evaluateScoreOnly(piece, goalsHome, goalsAway);
+      if (result === null) return null;
+      if (result === "lose") return "lose";
+      if (result === "void") win = false;
+    }
+    return win ? "win" : "void";
+  }
+
+  if (!SCORE_ONLY_KINDS.has(kind)) return null;
+
+  const goals: GoalEvent[] = [];
+  for (let i = 0; i < goalsHome; i++) goals.push({ team: "h", minute: 1, playerId: "" });
+  for (let i = 0; i < goalsAway; i++) goals.push({ team: "a", minute: 1, playerId: "" });
+
+  return evaluate(
+    statsForEval({
+      goalsHome,
+      goalsAway,
+      goals,
+      cardsHome: 0,
+      cardsAway: 0,
+      cards: [],
+      cornersHome: 0,
+      cornersAway: 0,
+      corners: [],
+    }),
+    selectionId,
+  );
 }
 
 function evaluate(s: EvalStats, id: string): "win" | "lose" | "void" {

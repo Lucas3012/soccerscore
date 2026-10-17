@@ -21,8 +21,9 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
       <Header user={{ name: user.name, balance_cents: balance }} />
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">{children}</main>
       <footer className="border-t border-edge py-6 text-center text-[11px] text-muted">
-        SoccerScore © {new Date().getFullYear()} — plataforma demonstrativa. Odds e resultados são
-        simulados; nenhum pagamento real é processado. Aposte com responsabilidade (+18).
+        SoccerScore © {new Date().getFullYear()} — plataforma demonstrativa. Jogos, ligas e placares ao
+        vivo: Flashscore. Odds, mercados e pagamentos são simulados — nenhum valor real é movimentado.
+        Aposte com responsabilidade (+18).
       </footer>
       <BetSlip />
     </SlipProvider>

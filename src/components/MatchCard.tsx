@@ -16,6 +16,8 @@ export type MatchCardData = {
   timeLabel: string;
   status: "upcoming" | "live" | "finished";
   minute?: number;
+  /** Live clock text shown on the chip (e.g. "37'" or "Intervalo"). */
+  clockLabel?: string;
   scoreHome?: number;
   scoreAway?: number;
 };
@@ -87,13 +89,13 @@ export default function MatchCard({ match, odds }: Props) {
       <div className="mt-3 grid grid-cols-3 gap-2">
         {mainButtons.map((button) => {
           const picked = has(`${match.id}::${button.key}`);
-          const locked = match.status !== "upcoming";
+          const locked = match.status === "finished";
           return (
             <button
               key={button.key}
               title={
                 locked
-                  ? "Mercado fechado — partida já iniciada"
+                  ? "Mercado fechado — partida encerrada"
                   : `${button.label} — ${formatOdd(button.odd)}`
               }
               disabled={locked}
@@ -130,7 +132,7 @@ export default function MatchCard({ match, odds }: Props) {
       {drawerOpen && (
         <OddsDrawer
           fixture={drawerFixture}
-          locked={match.status !== "upcoming"}
+          locked={match.status === "finished"}
           onClose={() => setDrawerOpen(false)}
           onPick={(fixture, market, selection) => pick(market, selection)}
           isPicked={has}
@@ -174,7 +176,7 @@ function StatusChip({ match }: { match: MatchCardData }) {
     return (
       <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 font-semibold text-red-300">
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
-        {match.minute}&apos;
+        {match.clockLabel ?? `${match.minute}'`}
       </span>
     );
   }

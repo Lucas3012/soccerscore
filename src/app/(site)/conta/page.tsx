@@ -133,6 +133,11 @@ export default async function AccountPage({ searchParams }: PageProps<"/conta">)
                       <span className="text-white/85">
                         {selection.home} x {selection.away}{" "}
                         <span className="text-muted">· {selection.leagueName}</span>
+                        {selection.matchId.startsWith("fs-") && (
+                          <span className="ml-1.5 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-300">
+                            ao vivo
+                          </span>
+                        )}
                       </span>
                       <span className="text-muted">
                         {selection.marketName} — <span className="text-white/80">{selection.label}</span>

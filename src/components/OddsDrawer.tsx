@@ -94,7 +94,7 @@ export default function OddsDrawer({ fixture, locked = false, onClose, onPick, i
         <div className="border-b border-edge px-5 py-3">
           {locked && (
             <p className="mb-3 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold">
-              Partida já iniciada — mercados apenas para consulta.
+              Partida encerrada — mercados apenas para consulta.
             </p>
           )}
           <input
