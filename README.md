@@ -92,3 +92,15 @@ src/
     db.ts / auth.ts      # Turso/libSQL e sessões
   proxy.ts               # middleware: exige login nas áreas protegidas
 ```
+
+## Verificação
+
+Scripts de apoio (lêem `.env.local` para o banco e falam com o servidor em execução):
+
+```bash
+node scripts/test-live.js      # registro, jogos ao vivo, 1500 mercados e apostas ao vivo
+node scripts/test-settle.js    # liquidação: placar real, estorno e múltipla com perna anulada
+node scripts/check-turso.js    # tabelas e usuários no banco
+```
+
+Para rodar contra a produção, use `BASE=https://soccerscore-eta.vercel.app node scripts/test-live.js`.
