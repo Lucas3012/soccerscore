@@ -33,12 +33,13 @@ type OddsPayload = {
 
 type Props = {
   fixture: DrawerFixture;
+  locked?: boolean;
   onClose: () => void;
   onPick: (fixture: DrawerFixture, market: Market, selection: Selection) => void;
   isPicked: (key: string) => boolean;
 };
 
-export default function OddsDrawer({ fixture, onClose, onPick, isPicked }: Props) {
+export default function OddsDrawer({ fixture, locked = false, onClose, onPick, isPicked }: Props) {
   const [data, setData] = useState<OddsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +92,11 @@ export default function OddsDrawer({ fixture, onClose, onPick, isPicked }: Props
         </div>
 
         <div className="border-b border-edge px-5 py-3">
+          {locked && (
+            <p className="mb-3 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold">
+              Partida já iniciada — mercados apenas para consulta.
+            </p>
+          )}
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -154,6 +160,7 @@ export default function OddsDrawer({ fixture, onClose, onPick, isPicked }: Props
               group={showAll ? "todos" : group}
               limitAll={!showAll}
               query={query}
+              locked={locked}
               isPicked={isPicked}
               onPick={(market, selection) => onPick(fixture, market, selection)}
             />
@@ -170,6 +177,7 @@ function MarketList({
   group,
   limitAll,
   query,
+  locked,
   isPicked,
   onPick,
 }: {
@@ -178,6 +186,7 @@ function MarketList({
   group: MarketGroupId | "todos";
   limitAll: boolean;
   query: string;
+  locked: boolean;
   isPicked: (key: string) => boolean;
   onPick: (market: Market, selection: Selection) => void;
 }) {
@@ -207,15 +216,20 @@ function MarketList({
               return (
                 <button
                   key={selection.id}
+                  disabled={locked}
                   onClick={() => onPick(market, selection)}
                   className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs transition ${
-                    picked
-                      ? "border-accent bg-accent/15"
-                      : "border-edge bg-background/60 hover:border-accent/70 hover:bg-accent/10"
+                    locked
+                      ? "cursor-not-allowed border-edge/60 bg-background/30 opacity-60"
+                      : picked
+                        ? "border-accent bg-accent/15"
+                        : "border-edge bg-background/60 hover:border-accent/70 hover:bg-accent/10"
                   }`}
                 >
                   <span className="text-white/85">{selection.label}</span>
-                  <span className="odd-num font-semibold text-accent">{formatOdd(selection.odd)}</span>
+                  <span className={`odd-num font-semibold ${locked ? "text-muted" : "text-accent"}`}>
+                    {formatOdd(selection.odd)}
+                  </span>
                 </button>
               );
             })}

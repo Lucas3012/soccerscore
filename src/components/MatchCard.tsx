@@ -87,10 +87,16 @@ export default function MatchCard({ match, odds }: Props) {
       <div className="mt-3 grid grid-cols-3 gap-2">
         {mainButtons.map((button) => {
           const picked = has(`${match.id}::${button.key}`);
+          const locked = match.status !== "upcoming";
           return (
             <button
               key={button.key}
-              title={`${button.label} — ${formatOdd(button.odd)}`}
+              title={
+                locked
+                  ? "Mercado fechado — partida já iniciada"
+                  : `${button.label} — ${formatOdd(button.odd)}`
+              }
+              disabled={locked}
               onClick={() =>
                 pick(
                   { id: "rf", name: "Resultado Final", group: "popular", selections: [] },
@@ -98,13 +104,17 @@ export default function MatchCard({ match, odds }: Props) {
                 )
               }
               className={`rounded-lg border px-2 py-2 text-center transition ${
-                picked
-                  ? "border-accent bg-accent/20"
-                  : "border-edge bg-panel2/70 hover:border-accent/70 hover:bg-accent/10"
+                locked
+                  ? "cursor-not-allowed border-edge/60 bg-panel2/40 opacity-50"
+                  : picked
+                    ? "border-accent bg-accent/20"
+                    : "border-edge bg-panel2/70 hover:border-accent/70 hover:bg-accent/10"
               }`}
             >
               <span className="block text-[10px] uppercase text-muted">{button.text}</span>
-              <span className="odd-num text-sm font-semibold text-accent">{formatOdd(button.odd)}</span>
+              <span className={`odd-num text-sm font-semibold ${locked ? "text-muted" : "text-accent"}`}>
+                {formatOdd(button.odd)}
+              </span>
             </button>
           );
         })}
@@ -120,6 +130,7 @@ export default function MatchCard({ match, odds }: Props) {
       {drawerOpen && (
         <OddsDrawer
           fixture={drawerFixture}
+          locked={match.status !== "upcoming"}
           onClose={() => setDrawerOpen(false)}
           onPick={(fixture, market, selection) => pick(market, selection)}
           isPicked={has}
