@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ⚽ SoccerScore
 
-## Getting Started
+Plataforma **demonstrativa** de apostas esportivas em português (pt-BR): campeonatos nacionais e
+internacionais com os brasileiros priorizados na tela principal, **1.500 mercados por partida**
+(apenas 1X2/draw visível até clicar no nome de um time), depósito via **PIX ou cartão de crédito**
+(simulados), login/cadastro e cupom de apostas.
 
-First, run the development server:
+> ⚠️ Ambiente de demonstração: odds e resultados são simulados, nenhum pagamento real é processado
+> e a liquidação é apenas para fins ilustrativos. Aposte com responsabilidade (+18).
+
+**Site ao vivo:** https://soccerscore-eta.vercel.app
+
+## Funcionalidades
+
+- **Tela principal** com filtros por dia (7 dias) e região; Brasileirão Série A em primeiro lugar.
+- **1.500 mercados por jogo** gerados deterministicamente (modelo de Poisson com margem de casa).
+  Só o 1X2 aparece no cartão; clique no nome do time para abrir a gaveta completa, com busca,
+  abas por categoria e “Todos os 1500”.
+- **Cupom de apostas** flutuante: uma seleção por partida, recálculo de odd, validação de saldo e
+  revalidação de odds no servidor ao apostar.
+- **Depósito** por **PIX** (BR Code EMV + QR Code) ou **cartão de crédito** (validação de Luhn e
+  aprovação simulada). Saldo creditado na hora. Nenhum outro método é aceito.
+- **Conta**: saldo, apostas (em aberto/ganhas/perdidas) e extrato de transações.
+- **Login/cadastro** obrigatório antes de acessar o site (sessão em cookie httpOnly por 30 dias).
+- **Liquidação automática** das apostas quando as partidas terminam.
+
+## Stack
+
+- [Next.js 16](https://nextjs.org) (App Router, Turbopack, TypeScript, Tailwind CSS v4)
+- [Turso](https://turso.tech) (libSQL) via `@libsql/client`
+- `bcryptjs` para hash de senha, `qrcode` para o QR Code do PIX
+
+## Como rodar localmente
 
 ```bash
+npm install
+cp .env.example .env.local   # preencha com suas credenciais do Turso
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Sem `TURSO_DATABASE_URL` o app usa automaticamente um banco local `file:local.db`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build   # build de produção
+npm start       # servidor de produção
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Variáveis de ambiente
 
-## Learn More
+| Variável             | Descrição                                              |
+| -------------------- | ------------------------------------------------------ |
+| `TURSO_DATABASE_URL` | URL do banco (`libsql://...turso.io`)                  |
+| `TURSO_AUTH_TOKEN`   | Token de acesso ao banco (leitura e escrita)           |
 
-To learn more about Next.js, take a look at the following resources:
+O schema (`users`, `sessions`, `transactions`, `bets`) é criado automaticamente na primeira consulta.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Estrutura
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+  app/
+    (auth)/login/        # entrar + criar conta
+    (site)/              # páginas protegidas: início, depósito, conta
+    api/                 # auth, odds, deposits, bets
+  components/            # MatchCard, OddsDrawer, BetSlip, Header, AuthForm, DepositTabs…
+  lib/
+    odds/                # modelo Poisson + gerador dos 1500 mercados + avaliação de resultados
+    sports.ts            # jogos do dia (determinísticos por data)
+    wallet.ts            # validação de cupom, aposta, crédito e liquidação
+    pix.ts               # BR Code EMV + CRC16
+    db.ts / auth.ts      # Turso/libSQL e sessões
+  proxy.ts               # middleware: exige login nas áreas protegidas
+```
